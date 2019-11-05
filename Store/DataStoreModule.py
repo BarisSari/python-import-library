@@ -392,6 +392,43 @@ class DataStore:
 
         return state_obj
 
+    def addToState(self, time, sensor, source, location=None, heading=None, course=None, speed=None, privacy=None):
+
+        # find objects for foreign keys
+        sensor = self.searchSensor(sensor)
+        datafile = self.searchDatafile(source)
+        privacy = self.searchPrivacy(privacy)
+
+        # If privacy is given, assign its id to privacy_id
+        privacy_id = None
+        if privacy:
+            privacy_id = privacy.privacy_id
+
+        # Sensor and datafile are necessary to create a State object
+        if sensor is None:
+            print(f"Sensor with name({sensor}) could not found!")
+            pass
+
+        if datafile is None:
+            print(f"Datafile with name({sensor}) could not found!")
+            pass
+
+
+
+        entry_id = self.addToEntries(self.DBClasses.State.tabletypeId, self.DBClasses.State.__tablename__)
+        state_obj = self.DBClasses.State(
+            state_id=entry_id,
+            time=time,
+            sensor_id=sensor.sensor_id,
+            location=location,
+            heading=heading,
+            course=course,
+            speed=speed,
+            datafile_id=datafile.datafile_id,
+            privacy_id=privacy_id
+        )
+        self.session.add(state_obj)
+        self.session.flush()
 
     #############################################################
     # Search/lookup functions
@@ -570,6 +607,41 @@ class DataStore:
                         for row in reader:
                             # this solves error of add functions which take one
                             # value instead of list of strings
+                            if len(row) == 1:
+                                method_to_call(row[0])
+                            else:
+                                method_to_call(*row)
+            else:
+                print(f"Method({possible_method}) not found!")
+
+    def populateMasurement(self, sample_data_folder=None):
+        """Import CSV files in the given folder to the given measurement table """
+        if sample_data_folder is None:
+            sample_data_folder = os.path.join("..", "default_data")
+
+        files = os.listdir(sample_data_folder)
+
+        measurement_tables = []
+        # Create Measurement table list
+        with self.session_scope() as session:
+            self.setupTabletypeMap()
+            measurement_table_objects = self.metaClasses[TableTypes.MEASUREMENT]
+            for object in list(measurement_table_objects):
+                measurement_tables.append(object.__tablename__)
+
+        measurement_files = [file for file in files if os.path.splitext(file)[0] in measurement_tables]
+        for file in measurement_files:
+            # split file into filename and extension
+            table_name, _ = os.path.splitext(file)
+            possible_method = 'addTo' + table_name
+            method_to_call = getattr(self, possible_method, None)
+            if method_to_call:
+                with open(os.path.join(sample_data_folder, file), 'r') as f:
+                    reader = csv.reader(f)
+                    # skip header
+                    _ = next(reader)
+                    with self.session_scope() as session:
+                        for row in reader:
                             if len(row) == 1:
                                 method_to_call(row[0])
                             else:
