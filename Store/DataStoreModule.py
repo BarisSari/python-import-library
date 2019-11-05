@@ -407,13 +407,11 @@ class DataStore:
         # Sensor and datafile are necessary to create a State object
         if sensor is None:
             print(f"Sensor with name({sensor}) could not found!")
-            pass
+            return
 
         if datafile is None:
             print(f"Datafile with name({sensor}) could not found!")
-            pass
-
-
+            return
 
         entry_id = self.addToEntries(self.DBClasses.State.tabletypeId, self.DBClasses.State.__tablename__)
         state_obj = self.DBClasses.State(
